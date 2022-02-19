@@ -1,7 +1,7 @@
 package de.timesnake.channel.proxy.main;
 
-import de.timesnake.channel.channel.SyncRun;
-import de.timesnake.channel.main.NetworkChannel;
+import de.timesnake.channel.core.NetworkChannel;
+import de.timesnake.channel.core.SyncRun;
 import de.timesnake.channel.proxy.channel.Channel;
 import net.md_5.bungee.api.plugin.Plugin;
 
