@@ -275,7 +275,6 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
         // broadcast unregister to other servers
         ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(senderPort, MessageType.Listener.UNREGISTER);
         for (Integer port : this.registeredServers) {
-            System.out.println(port);
             this.sendMessage(port, listenerMessage);
         }
 
