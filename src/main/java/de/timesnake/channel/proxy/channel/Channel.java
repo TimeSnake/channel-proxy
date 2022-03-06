@@ -81,6 +81,8 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             }
         } else if (message instanceof ChannelSupportMessage) {
             sendProxyServerMessage(message);
+        } else if(message instanceof ChannelDiscordMessage){
+            this.handleMessage(message);
         }
     }
 
