@@ -1,8 +1,10 @@
 package de.timesnake.channel.proxy.channel;
 
 import de.timesnake.channel.core.ChannelInfo;
+import de.timesnake.channel.core.Host;
 import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
 import de.timesnake.channel.util.message.*;
+import de.timesnake.library.basic.util.Tuple;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,19 +14,20 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
     private final PingPong ping = new PingPong();
 
     //saves the server, there the user is
-    protected final ConcurrentHashMap<UUID, Integer> userServers = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<UUID, Host> userServers = new ConcurrentHashMap<>();
 
     //list of servers, that are listening to a specific server-port (key)
-    protected final ConcurrentHashMap<Integer, Set<ChannelListenerMessage<?>>> serverPortListenerMessagesByPort = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<Integer, Set<ChannelListenerMessage<?>>> serverPortListenerMessagesByServerPort = new ConcurrentHashMap<>();
 
     //list of servers, that are listening to a specific server message type (key)
     protected final Collection<ChannelListenerMessage<?>> serverMessageTypeListenerMessages = new HashSet<>();
 
     //online servers, with an active channel
-    protected final Collection<Integer> registeredServers = new HashSet<>();
+    protected final Collection<Host> registeredServers = new HashSet<>();
 
     protected final Collection<ChannelTimeOutListener> timeOutListeners = new HashSet<>();
 
+    protected ConcurrentHashMap<Integer, Host> hostByServerPort = new ConcurrentHashMap<>();
 
     public Channel(Thread mainThread, Integer serverPort, Integer proxyPort) {
         super(mainThread, serverPort, proxyPort);
@@ -35,38 +38,50 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
         this.timeOutListeners.add(listener);
     }
 
+    public void sendMessageToServer(int port, ChannelMessage<?, ?> message) {
+        Host host = this.hostByServerPort.get(port);
+
+        if (host == null) {
+            return;
+        }
+
+        this.sendMessage(host, message);
+    }
+
     @Override
     public void sendMessage(ChannelMessage<?, ?> message) {
         if (message instanceof ChannelGroupMessage) {
-            for (Integer port : this.registeredServers) {
-                if (this.isServerReceivable(port)) {
-                    super.sendMessage(port, message);
+            for (Host host : this.registeredServers) {
+                if (this.isServerReceivable(host)) {
+                    super.sendMessage(host, message);
                 }
             }
         } else if (message instanceof ChannelUserMessage) {
             UUID uuid = ((ChannelUserMessage<?>) message).getUniqueId();
             if (this.userServers.containsKey(uuid) && this.userServers.get(uuid) != null) {
-                Integer port = this.userServers.get(uuid);
-                if (this.isServerReceivable(port)) {
-                    super.sendMessage(port, message);
+                Host host = this.userServers.get(uuid);
+                if (this.isServerReceivable(host)) {
+                    super.sendMessage(host, message);
                 }
             }
         } else if (message instanceof ChannelServerMessage) {
             Integer port = ((ChannelServerMessage<?>) message).getPort();
+            Host host = this.hostByServerPort.get(port);
+
             // send msg to self
-            if (this.isServerReceivable(port)) {
-                super.sendMessage(port, message);
+            if (this.isServerReceivable(host)) {
+                super.sendMessage(host, message);
             }
 
             // prevent duplicate message send
-            Set<Integer> receiverPorts = new HashSet<>();
+            Set<Host> receiverHosts = new HashSet<>();
 
-            Set<ChannelListenerMessage<?>> listenerMsgs = this.serverPortListenerMessagesByPort.get(port);
+            Set<ChannelListenerMessage<?>> listenerMsgs = this.serverPortListenerMessagesByServerPort.get(port);
             if (listenerMsgs != null) {
                 for (ChannelListenerMessage<?> listenerMsg : listenerMsgs) {
-                    if (!receiverPorts.contains(listenerMsg.getSenderPort()) && this.isServerReceivable(listenerMsg.getSenderPort())) {
-                        super.sendMessage(listenerMsg.getSenderPort(), message);
-                        receiverPorts.add(listenerMsg.getSenderPort());
+                    if (!receiverHosts.contains(listenerMsg.getSenderHost()) && this.isServerReceivable(listenerMsg.getSenderHost())) {
+                        super.sendMessage(listenerMsg.getSenderHost(), message);
+                        receiverHosts.add(listenerMsg.getSenderHost());
                     }
                 }
             }
@@ -74,50 +89,52 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             sendProxyServerMessage(message);
 
             for (ChannelListenerMessage<?> listenerMsg : this.serverMessageTypeListenerMessages) {
-                if (!receiverPorts.contains(listenerMsg.getSenderPort()) && this.isServerReceivable(listenerMsg.getSenderPort())) {
-                    super.sendMessage(listenerMsg.getSenderPort(), message);
-                    receiverPorts.add(listenerMsg.getSenderPort());
+                if (!receiverHosts.contains(listenerMsg.getSenderHost()) && this.isServerReceivable(listenerMsg.getSenderHost())) {
+                    super.sendMessage(listenerMsg.getSenderHost(), message);
+                    receiverHosts.add(listenerMsg.getSenderHost());
                 }
             }
         } else if (message instanceof ChannelSupportMessage) {
             sendProxyServerMessage(message);
-        } else if(message instanceof ChannelDiscordMessage){
+        } else if (message instanceof ChannelDiscordMessage) {
             this.handleMessage(message);
         }
     }
 
-    private boolean isServerReceivable(Integer port) {
-        return port != null && (this.registeredServers.contains(port) || port.equals(this.proxyPort));
+    private boolean isServerReceivable(Host host) {
+        return host != null && (this.registeredServers.contains(host) || host.equals(this.proxy));
     }
 
     @Override
     public void sendMessageSynchronized(ChannelMessage<?, ?> message) {
         if (message instanceof ChannelGroupMessage) {
-            for (Integer port : registeredServers) {
-                if (this.isServerReceivable(port)) {
-                    super.sendMessageSynchronized(port, message);
+            for (Host host : registeredServers) {
+                if (this.isServerReceivable(host)) {
+                    super.sendMessageSynchronized(host, message);
                 }
             }
         } else if (message instanceof ChannelUserMessage) {
             UUID uuid = ((ChannelUserMessage<?>) message).getUniqueId();
             if (this.userServers.containsKey(uuid)) {
-                Integer port = this.userServers.get(uuid);
-                if (this.isServerReceivable(port)) {
-                    super.sendMessageSynchronized(port, message);
+                Host host = this.userServers.get(uuid);
+                if (this.isServerReceivable(host)) {
+                    super.sendMessageSynchronized(host, message);
                 }
             }
         } else if (message instanceof ChannelServerMessage) {
             Integer port = ((ChannelServerMessage<?>) message).getPort();
+            Host host = this.hostByServerPort.get(port);
+
             // send msg to self
-            if (this.isServerReceivable(port)) {
-                super.sendMessageSynchronized(port, message);
+            if (this.isServerReceivable(host)) {
+                super.sendMessageSynchronized(host, message);
             }
 
-            Set<ChannelListenerMessage<?>> listenerMsgs = this.serverPortListenerMessagesByPort.get(port);
+            Set<ChannelListenerMessage<?>> listenerMsgs = this.serverPortListenerMessagesByServerPort.get(port);
             if (listenerMsgs != null) {
                 for (ChannelListenerMessage<?> listenerMsg : listenerMsgs) {
-                    if (this.isServerReceivable(listenerMsg.getSenderPort())) {
-                        super.sendMessageSynchronized(listenerMsg.getSenderPort(), message);
+                    if (this.isServerReceivable(listenerMsg.getSenderHost())) {
+                        super.sendMessageSynchronized(listenerMsg.getSenderHost(), message);
                     }
                 }
             }
@@ -125,50 +142,51 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             sendProxyServerMessage(message);
 
             for (ChannelListenerMessage<?> listenerMsg : this.serverMessageTypeListenerMessages) {
-                if (this.isServerReceivable(listenerMsg.getSenderPort())) {
-                    super.sendMessageSynchronized(listenerMsg.getSenderPort(), message);
+                if (this.isServerReceivable(listenerMsg.getSenderHost())) {
+                    super.sendMessageSynchronized(listenerMsg.getSenderHost(), message);
                 }
             }
         } else if (message instanceof ChannelSupportMessage) {
             Integer port = ((ChannelSupportMessage<?>) message).getPort();
+            Host host = this.hostByServerPort.get(port);
 
             // send to server with given port
-            if (this.isServerReceivable(port)) {
-                super.sendMessageSynchronized(port, message);
+            if (this.isServerReceivable(host)) {
+                super.sendMessageSynchronized(host, message);
             }
         }
     }
 
     private void sendProxyServerMessage(ChannelMessage<?, ?> message) {
-        Integer port;
-        for (Map.Entry<Integer, Set<MessageType<?>>> entry : receiverServerListeners.entrySet()) {
+        Host host;
+        for (Map.Entry<Host, Set<MessageType<?>>> entry : receiverServerListeners.entrySet()) {
 
-            port = entry.getKey();
-            if (this.isServerReceivable(port)) {
+            host = entry.getKey();
+            if (this.isServerReceivable(host)) {
                 Set<MessageType<?>> typeSet = entry.getValue();
                 if (typeSet == null || typeSet.isEmpty()) {
-                    this.sendMessageSynchronized(port, message);
+                    this.sendMessageSynchronized(host, message);
                 } else if (typeSet.contains(((ChannelServerMessage<?>) message).getMessageType())) {
-                    this.sendMessageSynchronized(port, message);
+                    this.sendMessageSynchronized(host, message);
                 }
             }
         }
     }
 
-    public void setUserServer(UUID uuid, Integer port) {
-        this.userServers.put(uuid, port);
+    public void setUserServer(UUID uuid, int serverPort) {
+        this.userServers.put(uuid, this.hostByServerPort.get(serverPort));
     }
 
     @Override
     public void handleListenerMessage(ChannelListenerMessage<?> msg) {
-        Integer senderPort = msg.getSenderPort();
+        Host senderHost = msg.getSenderHost();
 
         this.handleMessage(msg);
 
         if (msg.getMessageType().equals(MessageType.Listener.SERVER_PORT)) {
             Integer receiverPort = ((Integer) msg.getValue());
             //port equals sender port
-            if (receiverPort.equals(senderPort)) {
+            if (receiverPort.equals(senderHost.getPort())) {
                 return;
             }
 
@@ -178,16 +196,19 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
                 return;
             }
 
-            Set<ChannelListenerMessage<?>> messageList = this.serverPortListenerMessagesByPort.computeIfAbsent(receiverPort, k -> new HashSet<>());
+            Set<ChannelListenerMessage<?>> messageList =
+                    this.serverPortListenerMessagesByServerPort.computeIfAbsent(receiverPort, k -> new HashSet<>());
 
             // check if message with sender port already exists
-            if (messageList.stream().noneMatch(m -> m.getSenderPort().equals(senderPort))) {
+            if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
                 messageList.add(msg);
             }
 
+            Host receiverHost = this.hostByServerPort.get(receiverPort);
+
             //if receiver server online, send message
-            if (this.isServerReceivable(receiverPort)) {
-                this.sendMessage(receiverPort, msg);
+            if (this.isServerReceivable(receiverHost)) {
+                this.sendMessage(receiverHost, msg);
             }
 
         } else if (msg.getMessageType().equals(MessageType.Listener.SERVER_MESSAGE_TYPE)) {
@@ -200,7 +221,7 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
                 // check if list contains port
                 boolean contains = false;
                 for (ChannelListenerMessage<?> listener : this.serverMessageTypeListenerMessages) {
-                    if (listener.getSenderPort().equals(senderPort)) {
+                    if (listener.getSenderHost().equals(senderHost)) {
                         contains = true;
                         break;
                     }
@@ -211,37 +232,43 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
                     this.serverMessageTypeListenerMessages.add(msg);
 
                     //send listener to all servers
-                    for (Integer registeredServer : this.registeredServers) {
-                        if (!registeredServer.equals(msg.getSenderPort())) {
+                    for (Host registeredServer : this.registeredServers) {
+                        if (!registeredServer.equals(msg.getSenderHost())) {
                             this.sendMessage(registeredServer, msg);
                         }
                     }
                 }
 
             }
-        } else if (msg.getMessageType().equals(MessageType.Listener.REGISTER)) {
-            this.handleServerRegister(senderPort);
-        } else if (msg.getMessageType().equals(MessageType.Listener.UNREGISTER)) {
-            this.handleServerUnregister(senderPort);
+        } else if (msg.getMessageType().equals(MessageType.Listener.REGISTER_SERVER)) {
+            this.handleServerRegister(((Integer) msg.getValue()), senderHost);
+        } else if (msg.getMessageType().equals(MessageType.Listener.UNREGISTER_SERVER)) {
+            this.handleServerUnregister(((Integer) msg.getValue()), senderHost);
+        } else if (msg.getMessageType().equals(MessageType.Listener.REGISTER_HOST)) {
+            this.handleHostRegister(senderHost);
+        } else if (msg.getMessageType().equals(MessageType.Listener.UNREGISTER_HOST)) {
+            this.handleHostUnregister(senderHost);
         }
     }
 
-    public void handleServerRegister(Integer senderPort) {
+    public void handleServerRegister(Integer serverPort, Host host) {
+
+        this.hostByServerPort.put(serverPort, host);
 
         //get listener with new registered server port
-        Set<ChannelListenerMessage<?>> listenerMessages = serverPortListenerMessagesByPort.get(senderPort);
+        Set<ChannelListenerMessage<?>> listenerMessages = serverPortListenerMessagesByServerPort.get(serverPort);
         if (listenerMessages != null) {
             //send listener messages to new registered server
             for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
-                if (!senderPort.equals(listenerMessage.getSenderPort())) {
-                    this.sendMessage(senderPort, listenerMessage);
+                if (!host.equals(listenerMessage.getSenderHost())) {
+                    this.sendMessage(host, listenerMessage);
                 }
             }
         }
 
         for (ChannelListenerMessage<?> listenerMessage : this.serverMessageTypeListenerMessages) {
-            if (!senderPort.equals(listenerMessage.getSenderPort())) {
-                this.sendMessage(senderPort, listenerMessage);
+            if (!host.equals(listenerMessage.getSenderHost())) {
+                this.sendMessage(host, listenerMessage);
             }
         }
 
@@ -251,44 +278,86 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            this.sendMessage(senderPort, new ChannelListenerMessage<>(proxyPort, MessageType.Listener.REGISTER));
-            ChannelInfo.broadcastMessage("Send listener to " + senderPort + " finished");
-            this.registeredServers.add(senderPort);
+            this.sendMessage(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER,
+                    serverPort));
+            ChannelInfo.broadcastMessage("Send listener to " + host + " finished");
+            this.registeredServers.add(host);
         }).start();
     }
 
-    public void handleServerUnregister(Integer senderPort) {
+    public void handleServerUnregister(Integer serverPort, Host host) {
 
-        if (senderPort.equals(this.proxyPort)) {
+        if (host.equals(this.proxy)) {
             return;
         }
 
         // unregister from list
-        this.registeredServers.remove(senderPort);
+        this.registeredServers.remove(host);
+        this.hostByServerPort.remove(serverPort);
 
         // remove port listeners by the server
-        for (Set<ChannelListenerMessage<?>> messages : this.serverPortListenerMessagesByPort.values()) {
-            messages.removeIf(listenerMessage -> listenerMessage.getSenderPort().equals(senderPort));
+        for (Set<ChannelListenerMessage<?>> messages : this.serverPortListenerMessagesByServerPort.values()) {
+            messages.removeIf(listenerMessage -> listenerMessage.getSenderHost().equals(host));
         }
 
         // remove type listeners by the server
-        this.serverMessageTypeListenerMessages.removeIf(listener -> senderPort.equals(listener.getSenderPort()));
+        this.serverMessageTypeListenerMessages.removeIf(listener -> host.equals(listener.getSenderHost()));
 
         // broadcast unregister to other servers
-        ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(senderPort, MessageType.Listener.UNREGISTER);
-        for (Integer port : this.registeredServers) {
-            this.sendMessage(port, listenerMessage);
+        ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
+                MessageType.Listener.UNREGISTER_SERVER, serverPort);
+        for (Host registeredHosts : this.registeredServers) {
+            this.sendMessage(registeredHosts, listenerMessage);
         }
 
-        ChannelInfo.broadcastMessage("Send unregister for " + senderPort);
+        ChannelInfo.broadcastMessage("Send unregister for " + host);
+    }
+
+
+    public void handleHostRegister(Host host) {
+        this.sendMessage(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER, serverPort));
+        ChannelInfo.broadcastMessage("Added host " + host);
+        this.registeredServers.add(host);
+    }
+
+    public void handleHostUnregister(Host host) {
+
+        if (host.equals(this.proxy)) {
+            return;
+        }
+
+        // unregister from list
+        this.registeredServers.remove(host);
+
+        // remove port listeners by the server
+        for (Set<ChannelListenerMessage<?>> messages : this.serverPortListenerMessagesByServerPort.values()) {
+            messages.removeIf(listenerMessage -> listenerMessage.getSenderHost().equals(host));
+        }
+
+        // remove type listeners by the server
+        this.serverMessageTypeListenerMessages.removeIf(listener -> host.equals(listener.getSenderHost()));
+
+        // broadcast unregister to other servers
+        ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
+                MessageType.Listener.UNREGISTER_SERVER, serverPort);
+        for (Host registeredHosts : this.registeredServers) {
+            this.sendMessage(registeredHosts, listenerMessage);
+        }
+
+        ChannelInfo.broadcastMessage("Removed host " + host);
     }
 
     @Override
     protected void handlePingMessage(ChannelPingMessage message) {
-        this.ping.pingedPorts.remove(message.getSenderPort());
+        this.ping.pingedHosts.remove(new Tuple<>(message.getSenderPort(),
+                this.hostByServerPort.get(message.getSenderPort())));
     }
 
     public PingPong getPingPong() {
         return ping;
+    }
+
+    public Host getHostByServerPort(int serverPort) {
+        return this.hostByServerPort.get(serverPort);
     }
 }
