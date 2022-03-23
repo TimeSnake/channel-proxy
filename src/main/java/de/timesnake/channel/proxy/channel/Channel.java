@@ -6,7 +6,10 @@ import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
 import de.timesnake.channel.util.message.*;
 import de.timesnake.library.basic.util.Tuple;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class Channel extends de.timesnake.channel.core.Channel {
@@ -20,12 +23,13 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
     protected final ConcurrentHashMap<Integer, Set<ChannelListenerMessage<?>>> serverPortListenerMessagesByServerPort = new ConcurrentHashMap<>();
 
     //list of servers, that are listening to a specific server message type (key)
-    protected final Collection<ChannelListenerMessage<?>> serverMessageTypeListenerMessages = new HashSet<>();
+    protected final Collection<ChannelListenerMessage<?>> serverMessageTypeListenerMessages =
+            ConcurrentHashMap.newKeySet();
 
     //online servers, with an active channel
-    protected final Collection<Host> registeredServers = new HashSet<>();
+    protected final Collection<Host> registeredServers = ConcurrentHashMap.newKeySet();
 
-    protected final Collection<ChannelTimeOutListener> timeOutListeners = new HashSet<>();
+    protected final Collection<ChannelTimeOutListener> timeOutListeners = ConcurrentHashMap.newKeySet();
 
     protected ConcurrentHashMap<Integer, Host> hostByServerPort = new ConcurrentHashMap<>();
 
@@ -74,7 +78,7 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             }
 
             // prevent duplicate message send
-            Set<Host> receiverHosts = new HashSet<>();
+            Set<Host> receiverHosts = ConcurrentHashMap.newKeySet();
 
             Set<ChannelListenerMessage<?>> listenerMsgs = this.serverPortListenerMessagesByServerPort.get(port);
             if (listenerMsgs != null) {
@@ -197,7 +201,7 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             }
 
             Set<ChannelListenerMessage<?>> messageList =
-                    this.serverPortListenerMessagesByServerPort.computeIfAbsent(receiverPort, k -> new HashSet<>());
+                    this.serverPortListenerMessagesByServerPort.computeIfAbsent(receiverPort, k -> ConcurrentHashMap.newKeySet());
 
             // check if message with sender port already exists
             if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
