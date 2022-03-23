@@ -8,11 +8,11 @@ import de.timesnake.channel.util.message.MessageType;
 import de.timesnake.library.basic.util.Tuple;
 
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PingPong {
 
-    protected final Collection<Tuple<Integer, Host>> pingedHosts = new HashSet<>();
+    protected final Collection<Tuple<Integer, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
 
     public void ping(Collection<Integer> ports) {
         for (Integer port : ports) {
