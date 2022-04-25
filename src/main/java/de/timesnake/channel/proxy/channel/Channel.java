@@ -1,6 +1,6 @@
 package de.timesnake.channel.proxy.channel;
 
-import de.timesnake.channel.core.ChannelInfo;
+import de.timesnake.channel.core.ChannelLogger;
 import de.timesnake.channel.core.Host;
 import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
 import de.timesnake.channel.util.message.*;
@@ -33,8 +33,8 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
 
     protected ConcurrentHashMap<Integer, Host> hostByServerPort = new ConcurrentHashMap<>();
 
-    public Channel(Thread mainThread, Integer serverPort, Integer proxyPort) {
-        super(mainThread, serverPort, proxyPort);
+    public Channel(Thread mainThread, Integer serverPort, Integer proxyPort, ChannelLogger logger) {
+        super(mainThread, serverPort, proxyPort, logger);
         super.serverMessageServersRegistered = true;
     }
 
@@ -265,28 +265,21 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             //send listener messages to new registered server
             for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
                 if (!host.equals(listenerMessage.getSenderHost())) {
-                    this.sendMessage(host, listenerMessage);
+                    this.sendMessageSynchronized(host, listenerMessage);
                 }
             }
         }
 
         for (ChannelListenerMessage<?> listenerMessage : this.serverMessageTypeListenerMessages) {
             if (!host.equals(listenerMessage.getSenderHost())) {
-                this.sendMessage(host, listenerMessage);
+                this.sendMessageSynchronized(host, listenerMessage);
             }
         }
 
-        new Thread(() -> {
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            this.sendMessage(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER,
-                    serverPort));
-            ChannelInfo.broadcastMessage("Send listener to " + host + " finished");
-            this.registeredServers.add(host);
-        }).start();
+        this.sendMessageSynchronized(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER,
+                serverPort));
+        this.logger.logInfo("Send listener to " + host + " finished");
+        this.registeredServers.add(host);
     }
 
     public void handleServerUnregister(Integer serverPort, Host host) {
@@ -314,13 +307,15 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             this.sendMessage(registeredHosts, listenerMessage);
         }
 
-        ChannelInfo.broadcastMessage("Send unregister for " + host);
+        this.logger.logInfo("Send unregister for " + host);
+
+        this.disconnectHost(host);
     }
 
 
     public void handleHostRegister(Host host) {
         this.sendMessage(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER, serverPort));
-        ChannelInfo.broadcastMessage("Added host " + host);
+        this.logger.logInfo("Added host " + host);
         this.registeredServers.add(host);
     }
 
@@ -348,7 +343,9 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             this.sendMessage(registeredHosts, listenerMessage);
         }
 
-        ChannelInfo.broadcastMessage("Removed host " + host);
+        this.logger.logInfo("Removed host " + host);
+
+        this.disconnectHost(host);
     }
 
     @Override
