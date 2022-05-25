@@ -14,23 +14,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class Channel extends de.timesnake.channel.core.Channel {
 
-    private final PingPong ping = new PingPong();
-
     //saves the server, there the user is
     protected final ConcurrentHashMap<UUID, Host> userServers = new ConcurrentHashMap<>();
-
     //list of servers, that are listening to a specific server-port (key)
     protected final ConcurrentHashMap<Integer, Set<ChannelListenerMessage<?>>> serverPortListenerMessagesByServerPort = new ConcurrentHashMap<>();
-
     //list of servers, that are listening to a specific server message type (key)
     protected final Collection<ChannelListenerMessage<?>> serverMessageTypeListenerMessages =
             ConcurrentHashMap.newKeySet();
-
     //online servers, with an active channel
     protected final Collection<Host> registeredServers = ConcurrentHashMap.newKeySet();
-
     protected final Collection<ChannelTimeOutListener> timeOutListeners = ConcurrentHashMap.newKeySet();
-
+    private final PingPong ping = new PingPong();
     protected ConcurrentHashMap<Integer, Host> hostByServerPort = new ConcurrentHashMap<>();
 
     public Channel(Thread mainThread, Integer serverPort, Integer proxyPort, ChannelLogger logger) {
@@ -201,7 +195,8 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
             }
 
             Set<ChannelListenerMessage<?>> messageList =
-                    this.serverPortListenerMessagesByServerPort.computeIfAbsent(receiverPort, k -> ConcurrentHashMap.newKeySet());
+                    this.serverPortListenerMessagesByServerPort.computeIfAbsent(receiverPort,
+                            k -> ConcurrentHashMap.newKeySet());
 
             // check if message with sender port already exists
             if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
