@@ -52,6 +52,7 @@ tasks.withType(JavaCompile) {
 task buildFatJar(type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     baseName = rootProject.name
+    classifier = "all"
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
@@ -59,7 +60,7 @@ task buildFatJar(type: Jar) {
 jar.finalizedBy(buildFatJar)
 
 task copyJarToPlugins(type: Copy) {
-    from jar
+    from "build/libs/" + rootProject.name + "-" + version + "-all" + ".jar"
     into "../../plugins"
 }
 
