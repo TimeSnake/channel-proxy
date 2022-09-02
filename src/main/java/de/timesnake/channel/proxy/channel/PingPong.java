@@ -12,26 +12,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class PingPong {
 
-    protected final Collection<Tuple<Integer, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
+    protected final Collection<Tuple<String, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
 
-    public void ping(Collection<Integer> ports) {
-        for (Integer port : ports) {
-            Host host = ((Channel) NetworkChannel.getChannel()).getHostByServerPort(port);
+    public void ping(Collection<String> names) {
+        for (String name : names) {
+            Host host = ((Channel) NetworkChannel.getChannel()).getHost(name);
 
             if (host == null) {
                 continue;
             }
 
-            pingedHosts.add(new Tuple<>(port, host));
-            NetworkChannel.getChannel().sendMessage(host, new ChannelPingMessage(port, MessageType.Ping.PING));
+            pingedHosts.add(new Tuple<>(name, host));
+            NetworkChannel.getChannel().sendMessage(host, new ChannelPingMessage(name, MessageType.Ping.PING));
         }
     }
 
     public void checkPong() {
-        for (Tuple<Integer, Host> server : this.pingedHosts) {
+        for (Tuple<String, Host> server : this.pingedHosts) {
             ((Channel) NetworkChannel.getChannel()).handleServerUnregister(server.getA(), server.getB());
         }
-        for (Tuple<Integer, Host> server : this.pingedHosts) {
+        for (Tuple<String, Host> server : this.pingedHosts) {
             for (ChannelTimeOutListener listener : ((Channel) NetworkChannel.getChannel()).timeOutListeners) {
                 listener.onServerTimeOut(server.getA());
             }
