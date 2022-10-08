@@ -42,6 +42,11 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
     }
 
     @Override
+    public void sendMessageToProxy(ChannelMessage<?, ?> message) {
+        this.handleMessage(message.toStream().split(ChannelMessage.DIVIDER));
+    }
+
+    @Override
     public void sendMessage(ChannelMessage<?, ?> message) {
         if (message instanceof ChannelGroupMessage) {
             for (Host host : this.registeredServers) {
@@ -273,6 +278,12 @@ public abstract class Channel extends de.timesnake.channel.core.Channel {
     public void handleServerUnregister(String serverName, Host host) {
 
         if (host.equals(this.proxy)) {
+            ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
+                    MessageType.Listener.UNREGISTER_SERVER, serverName);
+            for (Host registeredHosts : this.registeredServers) {
+                this.sendMessage(registeredHosts, listenerMessage);
+            }
+            // nothing to clean up, because proxy is shutting down
             return;
         }
 
