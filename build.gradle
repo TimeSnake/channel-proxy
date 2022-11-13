@@ -1,14 +1,8 @@
-plugins {
-    id 'java'
-    id 'maven-publish'
-}
-
 repositories {
     mavenLocal()
     maven {
         url = uri 'https://papermc.io/repo/repository/maven-public/'
     }
-
     maven {
         url = uri 'https://repo.maven.apache.org/maven2/'
     }
@@ -25,28 +19,6 @@ dependencies {
 group = project.group
 version = '1.0-SNAPSHOT'
 archivesBaseName = 'channel-proxy'
-java.sourceCompatibility = 1.17
-java.targetCompatibility = 1.17
-
-task sourceJar(type: Jar) {
-    from sourceSets.main.allJava
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-
-            artifact sourceJar {
-                classifier "sources"
-            }
-        }
-    }
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
-}
 
 task buildFatJar(type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -55,8 +27,6 @@ task buildFatJar(type: Jar) {
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
-
-jar.finalizedBy(buildFatJar)
 
 task deleteOldPluginJar(type: Delete) {
     delete fileTree(dir: "${project.plugins_dir}", include: "**/${archivesBaseName}-*.jar")
@@ -67,16 +37,7 @@ task copyJarToPlugins(type: Copy) {
     into project.plugins_dir
 }
 
-copyJarToPlugins.dependsOn(deleteOldPluginJar)
+jar.finalizedBy(buildFatJar)
 copyJarToPlugins.dependsOn(buildFatJar)
+copyJarToPlugins.dependsOn(deleteOldPluginJar)
 jar.finalizedBy(copyJarToPlugins)
-
-task gitPush(type: Exec) {
-    description('Pushes to ' + project.git_url)
-    commandLine('git', 'push', 'origin', 'master')
-}
-
-task gitPull(type: Exec) {
-    description('Pushes to ' + project.git_url)
-    commandLine('git', 'pull', 'origin', 'master')
-}
