@@ -30,6 +30,9 @@ task buildFatJar(type: Jar) {
 
 task deleteOldPluginJar(type: Delete) {
     delete fileTree(dir: "${project.plugins_dir}", include: "**/${archivesBaseName}-*.jar")
+    onlyIf {
+        !jar.state.upToDate
+    }
 }
 
 task copyJarToPlugins(type: Copy) {
