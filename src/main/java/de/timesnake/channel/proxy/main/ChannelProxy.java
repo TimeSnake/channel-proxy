@@ -1,5 +1,5 @@
 /*
- * channel-proxy.main
+ * workspace.channel-proxy.main
  * Copyright (C) 2022 timesnake
  *
  * This program is free software; you can redistribute it and/or
@@ -23,10 +23,9 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.timesnake.channel.core.ChannelLogger;
 import de.timesnake.channel.core.NetworkChannel;
 import de.timesnake.channel.core.SyncRun;
-import de.timesnake.channel.proxy.channel.Channel;
+import de.timesnake.channel.proxy.channel.ProxyChannel;
 
 import java.util.logging.Logger;
 
@@ -35,17 +34,7 @@ import java.util.logging.Logger;
 public class ChannelProxy {
 
     public static void start(Integer port) {
-        NetworkChannel.start(new Channel(Thread.currentThread(), port, port, new ChannelLogger() {
-            @Override
-            public void printInfo(String msg) {
-                logger.info("[Channel] " + msg);
-            }
-
-            @Override
-            public void printWarning(String msg) {
-                logger.warning("[Channel] " + msg);
-            }
-        }) {
+        NetworkChannel.start(new ProxyChannel(Thread.currentThread(), port, port) {
             @Override
             public void runSync(SyncRun syncRun) {
                 server.getScheduler().buildTask(getPlugin(), syncRun::run).schedule();
