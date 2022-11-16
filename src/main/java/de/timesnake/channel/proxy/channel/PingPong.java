@@ -1,5 +1,5 @@
 /*
- * channel-proxy.main
+ * workspace.channel-proxy.main
  * Copyright (C) 2022 timesnake
  *
  * This program is free software; you can redistribute it and/or
@@ -34,7 +34,7 @@ public class PingPong {
 
     public void ping(Collection<String> names) {
         for (String name : names) {
-            Host host = ((Channel) NetworkChannel.getChannel()).getHost(name);
+            Host host = ((ProxyChannel) NetworkChannel.getChannel()).getHost(name);
 
             if (host == null) {
                 continue;
@@ -47,10 +47,10 @@ public class PingPong {
 
     public void checkPong() {
         for (Tuple<String, Host> server : this.pingedHosts) {
-            ((Channel) NetworkChannel.getChannel()).handleServerUnregister(server.getA(), server.getB());
+            ((ProxyChannel) NetworkChannel.getChannel()).handleServerUnregister(server.getA(), server.getB());
         }
         for (Tuple<String, Host> server : this.pingedHosts) {
-            for (ChannelTimeOutListener listener : ((Channel) NetworkChannel.getChannel()).timeOutListeners) {
+            for (ChannelTimeOutListener listener : ((ProxyChannel) NetworkChannel.getChannel()).timeOutListeners) {
                 listener.onServerTimeOut(server.getA());
             }
         }
