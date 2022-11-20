@@ -19,269 +19,75 @@
 package de.timesnake.channel.proxy.channel;
 
 import de.timesnake.channel.core.Channel;
-import de.timesnake.channel.core.ChannelType;
 import de.timesnake.channel.core.Host;
 import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
-import de.timesnake.channel.util.message.*;
+import de.timesnake.channel.util.message.ChannelPingMessage;
+import de.timesnake.channel.util.message.MessageType;
 import de.timesnake.library.basic.util.Tuple;
 
 import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
-public abstract class ProxyChannel extends de.timesnake.channel.core.Channel {
+public abstract class ProxyChannel extends Channel {
 
-    //saves the server, there the user is
-    protected final ConcurrentHashMap<UUID, Host> userServers = new ConcurrentHashMap<>();
+    public static ProxyChannel getInstance() {
+        return (ProxyChannel) Channel.getInstance();
+    }
 
-    protected final ConcurrentHashMap<ChannelType<?>, ConcurrentHashMap<Object, Set<ChannelListenerMessage<?>>>>
-            channelListenerByIdentifierByChannelType = new ConcurrentHashMap<>();
-    protected final ConcurrentHashMap<ChannelType<?>, ConcurrentHashMap<MessageType<?>, Set<ChannelListenerMessage<?>>>>
-            channelListenerByMessageTypeByChannelType = new ConcurrentHashMap<>();
-
-    //online servers, with an active channel
-    protected final Collection<Host> registeredHosts = ConcurrentHashMap.newKeySet();
-
+    protected final Collection<Tuple<String, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
     protected final Collection<ChannelTimeOutListener> timeOutListeners = ConcurrentHashMap.newKeySet();
-    private final PingPong ping = new PingPong();
-
-    protected ConcurrentHashMap<String, Host> serverHostByName = new ConcurrentHashMap<>();
 
     public ProxyChannel(Thread mainThread, Integer serverPort, Integer proxyPort) {
         super(mainThread, PROXY_NAME, serverPort, proxyPort);
-        super.listenerLoaded = true;
+    }
 
-        for (ChannelType<?> type : ChannelType.TYPES) {
-            this.channelListenerByIdentifierByChannelType.put(type, new ConcurrentHashMap<>());
-            this.channelListenerByMessageTypeByChannelType.put(type, new ConcurrentHashMap<>());
-        }
+    @Override
+    protected void loadChannelClient() {
+        this.client = new ProxyChannelClient(this);
+    }
+
+    @Override
+    protected void handlePingMessage(ChannelPingMessage msg) {
+        this.pingedHosts.remove(new Tuple<>(msg.getSenderName(),
+                this.getClient().getHostOfServer(msg.getSenderName())));
     }
 
     public void addTimeOutListener(ChannelTimeOutListener listener) {
         this.timeOutListeners.add(listener);
     }
 
-    @Override
-    public void sendMessageToProxy(ChannelMessage<?, ?> message) {
-        this.handleMessage(message.toStream().split(ChannelMessage.DIVIDER));
+    public void ping(Collection<String> names) {
+        for (String name : names) {
+            Host host = this.getClient().getHostOfServer(name);
+
+            if (host == null) {
+                continue;
+            }
+
+            pingedHosts.add(new Tuple<>(name, host));
+            this.client.sendMessage(host, new ChannelPingMessage(name, MessageType.Ping.PING));
+        }
     }
 
-    private boolean isHostReceivable(Host host) {
-        return host != null && (this.registeredHosts.contains(host) || host.equals(this.proxy));
-    }
-
-    @Override
-    public void sendMessage(ChannelMessage<?, ?> message) {
-        new Thread(() -> this.sendMessageSynchronized(message)).start();
-    }
-
-    @Override
-    public void sendMessageSynchronized(ChannelMessage<?, ?> message) {
-        if (message instanceof ChannelGroupMessage) {
-            for (Host host : registeredHosts) {
-                if (this.isHostReceivable(host)) {
-                    super.sendMessageSynchronized(host, message);
-                }
-            }
-        } else if (message instanceof ChannelUserMessage) {
-            UUID uuid = ((ChannelUserMessage<?>) message).getUniqueId();
-            if (this.userServers.containsKey(uuid)) {
-                Host host = this.userServers.get(uuid);
-                if (this.isHostReceivable(host)) {
-                    super.sendMessageSynchronized(host, message);
-                }
-            }
-        } else if (message instanceof ChannelServerMessage) {
-            String name = ((ChannelServerMessage<?>) message).getName();
-            Host host = this.serverHostByName.get(name);
-
-            // send msg to server it self
-            if (this.isHostReceivable(host)) {
-                super.sendMessageSynchronized(host, message);
-            }
-        } else if (message instanceof ChannelSupportMessage) {
-            String name = ((ChannelSupportMessage<?>) message).getName();
-            Host host = this.serverHostByName.get(name);
-
-            // send to server with given name
-            if (this.isHostReceivable(host)) {
-                super.sendMessageSynchronized(host, message);
+    public void checkPong() {
+        for (Tuple<String, Host> server : this.pingedHosts) {
+            this.getClient().handleServerUnregister(server.getA(), server.getB());
+        }
+        for (Tuple<String, Host> server : this.pingedHosts) {
+            for (ChannelTimeOutListener listener : this.timeOutListeners) {
+                listener.onServerTimeOut(server.getA());
             }
         }
-
-        super.sendMessageSynchronized(message);
-    }
-
-    public void setUserServer(UUID uuid, String serverName) {
-        this.userServers.put(uuid, this.serverHostByName.get(serverName));
+        this.pingedHosts.clear();
     }
 
     @Override
-    public void handleListenerMessage(ChannelListenerMessage<?> msg) {
-        Host senderHost = msg.getSenderHost();
-
-        this.handleMessage(msg);
-
-        if (msg.getMessageType().equals(MessageType.Listener.IDENTIFIER_LISTENER)) {
-            ChannelType<?> channelType = ((MessageType.MessageIdentifierListener<?>) msg.getValue()).getChannelType();
-            Object identifier = ((MessageType.MessageIdentifierListener<?>) msg.getValue()).getIdentifier();
-
-            this.addListener(msg);
-
-            // if register only for proxy then done
-            if (channelType.equals(ChannelType.SERVER) && ((String) identifier).equalsIgnoreCase(this.getProxyName())) {
-                return;
-            }
-
-            Set<ChannelListenerMessage<?>> messageList = this.channelListenerByIdentifierByChannelType
-                    .get(channelType).computeIfAbsent(identifier, k -> ConcurrentHashMap.newKeySet());
-
-            if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
-                messageList.add(msg);
-            }
-
-            this.broadcastListenerMessage(msg);
-        } else if (msg.getMessageType().equals(MessageType.Listener.MESSAGE_TYPE_LISTENER)) {
-            ChannelType<?> channelType = ((MessageType.MessageTypeListener) msg.getValue()).getChannelType();
-            MessageType<?> messageType = ((MessageType.MessageTypeListener) msg.getValue()).getMessageType();
-
-            this.addListener(msg);
-
-            Set<ChannelListenerMessage<?>> messageList = this.channelListenerByMessageTypeByChannelType
-                    .get(channelType).computeIfAbsent(messageType, k -> ConcurrentHashMap.newKeySet());
-
-            if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
-                messageList.add(msg);
-            }
-
-            this.broadcastListenerMessage(msg);
-        } else if (msg.getMessageType().equals(MessageType.Listener.REGISTER_SERVER)) {
-            this.handleServerRegister(((String) msg.getValue()), senderHost);
-        } else if (msg.getMessageType().equals(MessageType.Listener.UNREGISTER_SERVER)) {
-            this.handleServerUnregister(((String) msg.getValue()), senderHost);
-        } else if (msg.getMessageType().equals(MessageType.Listener.REGISTER_HOST)) {
-            this.handleHostRegister(senderHost);
-        } else if (msg.getMessageType().equals(MessageType.Listener.UNREGISTER_HOST)) {
-            this.handleHostUnregister(senderHost);
-        }
+    public ProxyChannelClient getClient() {
+        return (ProxyChannelClient) super.getClient();
     }
 
-    private void broadcastListenerMessage(ChannelListenerMessage<?> msg) {
-        for (Host host : this.registeredHosts) {
-            this.sendMessage(host, msg);
-        }
-    }
-
-    public void handleServerRegister(String serverName, Host host) {
-
-        this.serverHostByName.put(serverName, host);
-
-        Set<ChannelListenerMessage<?>> listenerMessages = this.channelListenerByIdentifierByChannelType.values().stream()
-                .map(Map::values).flatMap(Collection::stream).flatMap(Collection::stream)
-                .filter(msg -> Channel.isInterestingForServer(host, serverName, msg)).collect(Collectors.toSet());
-
-        listenerMessages.addAll(this.channelListenerByMessageTypeByChannelType.values().stream().map(Map::values)
-                .flatMap(Collection::stream).flatMap(Collection::stream)
-                .filter(msg -> Channel.isInterestingForServer(host, serverName, msg)).collect(Collectors.toSet()));
-
-        for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
-            this.sendMessageSynchronized(host, listenerMessage);
-        }
-
-        this.sendMessageSynchronized(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER,
-                serverName));
-        Channel.LOGGER.info("Send listener to " + host + " finished");
-        this.registeredHosts.add(host);
-    }
-
-    public void handleServerUnregister(String serverName, Host host) {
-
-        if (host.equals(this.proxy)) {
-            ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
-                    MessageType.Listener.UNREGISTER_SERVER, serverName);
-            for (Host registeredHosts : this.registeredHosts) {
-                this.sendMessage(registeredHosts, listenerMessage);
-            }
-            // nothing to clean up, because proxy is shutting down
-            return;
-        }
-
-        // unregister from list
-        this.registeredHosts.remove(host);
-        this.serverHostByName.remove(serverName);
-
-        // removed saved listener messages
-        this.channelListenerByIdentifierByChannelType.values().forEach(map -> map.values()
-                .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
-        );
-
-        this.channelListenerByMessageTypeByChannelType.values().forEach(map -> map.values()
-                .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
-        );
-
-        // broadcast unregister to other servers
-        ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
-                MessageType.Listener.UNREGISTER_SERVER, serverName);
-        for (Host registeredHosts : this.registeredHosts) {
-            this.sendMessage(registeredHosts, listenerMessage);
-        }
-
-        Channel.LOGGER.info("Send unregister for " + host);
-
-        this.disconnectHost(host);
-    }
-
-
-    public void handleHostRegister(Host host) {
-        this.sendMessage(host, new ChannelListenerMessage<>(proxy, MessageType.Listener.REGISTER_SERVER, this.getProxyName()));
-        Channel.LOGGER.info("Added host " + host);
-        this.registeredHosts.add(host);
-    }
-
-    public void handleHostUnregister(Host host) {
-
-        if (host.equals(this.proxy)) {
-            return;
-        }
-
-        // unregister from list
-        this.registeredHosts.remove(host);
-
-        // removed saved listener messages
-        this.channelListenerByIdentifierByChannelType.values().forEach(map -> map.values()
-                .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
-        );
-
-        this.channelListenerByMessageTypeByChannelType.values().forEach(map -> map.values()
-                .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
-        );
-
-        // broadcast unregister to other servers
-        ChannelListenerMessage<?> listenerMessage = new ChannelListenerMessage<>(host,
-                MessageType.Listener.UNREGISTER_SERVER, this.getProxyName());
-        for (Host registeredHosts : this.registeredHosts) {
-            this.sendMessage(registeredHosts, listenerMessage);
-        }
-
-        Channel.LOGGER.info("Removed host " + host);
-
-        this.disconnectHost(host);
-    }
-
-    @Override
-    protected void handlePingMessage(ChannelPingMessage message) {
-        this.ping.pingedHosts.remove(new Tuple<>(message.getSenderName(),
-                this.serverHostByName.get(message.getSenderName())));
-    }
-
-    public PingPong getPingPong() {
-        return ping;
-    }
-
-    public Host getHost(String serverName) {
-        return this.serverHostByName.get(serverName);
+    public void setUserServer(UUID uniqueId, String server) {
+        this.getClient().setUserServer(uniqueId, server);
     }
 }
