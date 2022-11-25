@@ -17,7 +17,7 @@ dependencies {
 }
 
 group = project.group
-version = '1.0-SNAPSHOT'
+version = project(":channel-api").version
 archivesBaseName = 'channel-proxy'
 
 task buildFatJar(type: Jar) {
