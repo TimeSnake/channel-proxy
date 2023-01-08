@@ -22,7 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-public class ProxyChannelClient extends ChannelClient {
+public class ProxyChannelClient extends Channel.ServerChannelClient {
 
     //saves the server, there the user is
     protected final ConcurrentHashMap<UUID, Host> userServers = new ConcurrentHashMap<>();
@@ -50,7 +50,8 @@ public class ProxyChannelClient extends ChannelClient {
     }
 
     private boolean isHostReceivable(Host host) {
-        return host != null && (this.registeredHosts.contains(host) || host.equals(this.manager.getProxy()));
+        return host != null && (this.registeredHosts.contains(host) || host.equals(
+                this.manager.getProxy()));
     }
 
     @Override
@@ -113,13 +114,15 @@ public class ProxyChannelClient extends ChannelClient {
             this.addRemoteListener(msg);
 
             // if register only for proxy then done
-            if (channelType.equals(ChannelType.SERVER) && ((String) identifier).equalsIgnoreCase(Channel.PROXY_NAME)) {
+            if (channelType.equals(ChannelType.SERVER) && ((String) identifier).equalsIgnoreCase(
+                    Channel.PROXY_NAME)) {
                 return;
             }
 
             // cache for other servers
             Set<ChannelListenerMessage<?>> messageList = this.channelListenerByIdentifierByChannelType
-                    .get(channelType).computeIfAbsent(identifier, k -> ConcurrentHashMap.newKeySet());
+                    .get(channelType)
+                    .computeIfAbsent(identifier, k -> ConcurrentHashMap.newKeySet());
 
             if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
                 messageList.add(msg);
@@ -132,11 +135,23 @@ public class ProxyChannelClient extends ChannelClient {
 
             this.addRemoteListener(msg);
 
-            Set<ChannelListenerMessage<?>> messageList = this.channelListenerByMessageTypeByChannelType
-                    .get(channelType).computeIfAbsent(messageType, k -> ConcurrentHashMap.newKeySet());
-
-            if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
-                messageList.add(msg);
+            Set<ChannelListenerMessage<?>> messageList;
+            if (messageType != null) {
+                messageList = this.channelListenerByMessageTypeByChannelType
+                        .get(channelType)
+                        .computeIfAbsent(messageType, k -> ConcurrentHashMap.newKeySet());
+                if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
+                    messageList.add(msg);
+                }
+            } else {
+                for (MessageType<?> type : channelType.getMessageTypes()) {
+                    messageList = this.channelListenerByMessageTypeByChannelType
+                            .get(channelType)
+                            .computeIfAbsent(type, k -> ConcurrentHashMap.newKeySet());
+                    if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
+                        messageList.add(msg);
+                    }
+                }
             }
 
             this.broadcastListenerMessage(msg);
@@ -171,13 +186,17 @@ public class ProxyChannelClient extends ChannelClient {
 
         this.serverHostByName.put(serverName, host);
 
-        Set<ChannelListenerMessage<?>> listenerMessages = this.channelListenerByIdentifierByChannelType.values().stream()
+        Set<ChannelListenerMessage<?>> listenerMessages = this.channelListenerByIdentifierByChannelType.values()
+                .stream()
                 .map(Map::values).flatMap(Collection::stream).flatMap(Collection::stream)
-                .filter(msg -> ChannelClient.isInterestingForServer(host, serverName, msg)).collect(Collectors.toSet());
+                .filter(msg -> ChannelClient.isInterestingForServer(host, serverName, msg))
+                .collect(Collectors.toSet());
 
-        listenerMessages.addAll(this.channelListenerByMessageTypeByChannelType.values().stream().map(Map::values)
-                .flatMap(Collection::stream).flatMap(Collection::stream)
-                .filter(msg -> ChannelClient.isInterestingForServer(host, serverName, msg)).collect(Collectors.toSet()));
+        listenerMessages.addAll(
+                this.channelListenerByMessageTypeByChannelType.values().stream().map(Map::values)
+                        .flatMap(Collection::stream).flatMap(Collection::stream)
+                        .filter(msg -> ChannelClient.isInterestingForServer(host, serverName, msg))
+                        .collect(Collectors.toSet()));
 
         for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
             this.sendMessageSynchronized(host, listenerMessage);
@@ -221,7 +240,8 @@ public class ProxyChannelClient extends ChannelClient {
         }
 
         // broadcast unregister to all registered hosts
-        this.broadcastListenerMessage(new ChannelListenerMessage<>(host, MessageType.Listener.UNREGISTER_HOST));
+        this.broadcastListenerMessage(
+                new ChannelListenerMessage<>(host, MessageType.Listener.UNREGISTER_HOST));
         Channel.LOGGER.info("Send unregister for " + host);
 
         this.cleanupAndDisconnectHost(host);

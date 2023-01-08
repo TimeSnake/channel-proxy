@@ -28,11 +28,15 @@ public abstract class ProxyChannel extends Channel {
     }
 
     @Override
+    protected void loadChannelServer() {
+        this.server = new ProxyChannelServer(this);
+    }
+
+    @Override
     protected void loadChannelClient() {
         this.client = new ProxyChannelClient(this);
     }
 
-    @Override
     protected void handlePingMessage(ChannelPingMessage msg) {
         this.pingedHosts.remove(new Tuple<>(msg.getSenderName(),
                 this.getClient().getHostOfServer(msg.getSenderName())));
