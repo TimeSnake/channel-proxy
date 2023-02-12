@@ -11,6 +11,7 @@ repositories {
 dependencies {
     implementation project(':channel-api')
     compileOnly project(':library-basic')
+    compileOnly project(':library-chat')
 
     compileOnly project.velocity
     annotationProcessor project.velocity
