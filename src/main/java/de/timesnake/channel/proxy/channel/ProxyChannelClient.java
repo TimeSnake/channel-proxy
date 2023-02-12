@@ -97,6 +97,9 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
     }
 
     public void setUserServer(UUID uuid, String serverName) {
+        if (serverName == null) {
+            return;
+        }
         this.userServers.put(uuid, this.serverHostByName.get(serverName));
     }
 
