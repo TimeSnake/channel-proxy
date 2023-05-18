@@ -12,6 +12,7 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.core.SyncRun;
 import de.timesnake.channel.proxy.channel.ProxyChannel;
+import de.timesnake.library.basic.util.Loggers;
 import java.util.logging.Logger;
 
 @Plugin(id = "channel-proxy", name = "ChannelProxy", version = "1.0-SNAPSHOT",
@@ -41,14 +42,12 @@ public class ChannelProxy {
 
     private static ChannelProxy plugin;
     private static ProxyServer server;
-    private static Logger logger;
 
     @Inject
     public ChannelProxy(ProxyServer server, Logger logger) {
         ChannelProxy.server = server;
-        ChannelProxy.logger = logger;
 
-        de.timesnake.channel.util.Channel.LOGGER.setUseParentHandlers(false);
+        Loggers.CHANNEL.setUseParentHandlers(false);
     }
 
     @Subscribe

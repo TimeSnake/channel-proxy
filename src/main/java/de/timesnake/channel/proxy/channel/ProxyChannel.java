@@ -7,9 +7,10 @@ package de.timesnake.channel.proxy.channel;
 import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.core.Host;
 import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
-import de.timesnake.channel.util.message.ChannelPingMessage;
-import de.timesnake.channel.util.message.MessageType;
+import de.timesnake.channel.util.message.ChannelHeartbeatMessage;
+import de.timesnake.channel.util.message.MessageType.Heartbeat;
 import de.timesnake.library.basic.util.Tuple;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,7 @@ public abstract class ProxyChannel extends Channel {
 
     public ProxyChannel(Thread mainThread, Integer serverPort, Integer proxyPort) {
         super(mainThread, PROXY_NAME, serverPort, proxyPort);
+        this.setTimeOut(Duration.ofSeconds(60));
     }
 
     @Override
@@ -37,9 +39,10 @@ public abstract class ProxyChannel extends Channel {
         this.client = new ProxyChannelClient(this);
     }
 
-    protected void handlePingMessage(ChannelPingMessage msg) {
-        this.pingedHosts.remove(new Tuple<>(msg.getSenderName(),
-                this.getClient().getHostOfServer(msg.getSenderName())));
+    protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
+        if (msg.getMessageType().equals(Heartbeat.PONG)) {
+            this.pingedHosts.remove(new Tuple<>(((String) msg.getValue()), msg.getSender()));
+        }
     }
 
     public void addTimeOutListener(ChannelTimeOutListener listener) {
@@ -55,7 +58,7 @@ public abstract class ProxyChannel extends Channel {
             }
 
             pingedHosts.add(new Tuple<>(name, host));
-            this.client.sendMessage(host, new ChannelPingMessage(name, MessageType.Ping.PING));
+            this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.PING));
         }
     }
 
