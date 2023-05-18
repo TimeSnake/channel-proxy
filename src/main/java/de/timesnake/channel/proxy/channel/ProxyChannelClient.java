@@ -15,6 +15,7 @@ import de.timesnake.channel.util.message.ChannelServerMessage;
 import de.timesnake.channel.util.message.ChannelSupportMessage;
 import de.timesnake.channel.util.message.ChannelUserMessage;
 import de.timesnake.channel.util.message.MessageType;
+import de.timesnake.library.basic.util.Loggers;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -209,7 +210,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
         this.sendMessageSynchronized(host, new ChannelListenerMessage<>(this.manager.getProxy(),
                 MessageType.Listener.REGISTER_SERVER, serverName));
 
-        Channel.LOGGER.info("Send listener to " + host + " finished");
+        Loggers.CHANNEL.info("Send listener to " + host + " finished");
         this.registeredHosts.add(host);
     }
 
@@ -217,7 +218,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
         // broadcast unregister to all registered hosts
         this.broadcastListenerMessage(new ChannelListenerMessage<>(host,
                 MessageType.Listener.UNREGISTER_SERVER, serverName));
-        Channel.LOGGER.info("Send unregister for " + host);
+        Loggers.CHANNEL.info("Send unregister for " + host);
 
         // nothing to clean up, because proxy is shutting down
         if (host.equals(this.manager.getProxy())) {
@@ -232,7 +233,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
     public void handleHostRegister(Host host) {
         this.sendMessage(host, new ChannelListenerMessage<>(this.manager.getProxy(),
                 MessageType.Listener.REGISTER_SERVER, Channel.PROXY_NAME));
-        Channel.LOGGER.info("Added host " + host);
+        Loggers.CHANNEL.info("Added host " + host);
         this.registeredHosts.add(host);
     }
 
@@ -245,7 +246,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
         // broadcast unregister to all registered hosts
         this.broadcastListenerMessage(
                 new ChannelListenerMessage<>(host, MessageType.Listener.UNREGISTER_HOST));
-        Channel.LOGGER.info("Send unregister for " + host);
+        Loggers.CHANNEL.info("Send unregister for " + host);
 
         this.cleanupAndDisconnectHost(host);
     }

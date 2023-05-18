@@ -5,7 +5,7 @@
 package de.timesnake.channel.proxy.channel;
 
 import de.timesnake.channel.core.Channel;
-import de.timesnake.channel.util.message.ChannelPingMessage;
+import de.timesnake.channel.util.message.ChannelHeartbeatMessage;
 
 public class ProxyChannelServer extends Channel.ServerChannelServer {
 
@@ -14,7 +14,8 @@ public class ProxyChannelServer extends Channel.ServerChannelServer {
     }
 
     @Override
-    protected void handlePingMessage(ChannelPingMessage msg) {
+    protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
+        super.handlePingMessage(msg);
         ((ProxyChannel) this.manager).handlePingMessage(msg);
     }
 }
