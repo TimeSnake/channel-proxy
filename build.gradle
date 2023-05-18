@@ -1,20 +1,20 @@
 repositories {
-    mavenLocal()
-    maven {
-        url = uri 'https://papermc.io/repo/repository/maven-public/'
-    }
-    maven {
-        url = uri 'https://repo.maven.apache.org/maven2/'
-    }
+  mavenLocal()
+  maven {
+    url = uri 'https://papermc.io/repo/repository/maven-public/'
+  }
+  maven {
+    url = uri 'https://repo.maven.apache.org/maven2/'
+  }
 }
 
 dependencies {
-    implementation project(':channel-api')
-    compileOnly project(':library-basic')
-    compileOnly project(':library-chat')
+  implementation project(':channel-api')
+  compileOnly project(':library-basic')
+  compileOnly project(':library-chat')
 
-    compileOnly project.velocity
-    annotationProcessor project.velocity
+  compileOnly project.velocity
+  annotationProcessor project.velocity
 }
 
 group = project.group
@@ -22,22 +22,22 @@ version = project(":channel-api").version
 archivesBaseName = 'channel-proxy'
 
 task buildFatJar(type: Jar) {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    classifier = "all"
-    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  classifier = "all"
+  from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+  with jar
 }
 
 task deleteOldPluginJar(type: Delete) {
-    delete fileTree(dir: "${project.plugins_dir}", include: "**/${archivesBaseName}-*.jar")
-    onlyIf {
-        !jar.state.upToDate
-    }
+  delete fileTree(dir: "${project.plugins_dir}", include: "**/${archivesBaseName}-*.jar")
+  onlyIf {
+    !jar.state.upToDate
+  }
 }
 
 task copyJarToPlugins(type: Copy) {
-    from "build/libs/" + archivesBaseName + "-" + version + "-all" + ".jar"
-    into project.plugins_dir
+  from "build/libs/" + archivesBaseName + "-" + version + "-all" + ".jar"
+  into project.plugins_dir
 }
 
 jar.finalizedBy(buildFatJar)
