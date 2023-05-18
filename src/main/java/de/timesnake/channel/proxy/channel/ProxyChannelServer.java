@@ -9,13 +9,13 @@ import de.timesnake.channel.util.message.ChannelHeartbeatMessage;
 
 public class ProxyChannelServer extends Channel.ServerChannelServer {
 
-    protected ProxyChannelServer(Channel manager) {
-        super(manager);
-    }
+  protected ProxyChannelServer(Channel manager) {
+    super(manager);
+  }
 
-    @Override
-    protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
-        super.handlePingMessage(msg);
-        ((ProxyChannel) this.manager).handlePingMessage(msg);
-    }
+  @Override
+  protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
+    super.handlePingMessage(msg);
+    ((ProxyChannel) this.manager).handlePingMessage(msg);
+  }
 }
