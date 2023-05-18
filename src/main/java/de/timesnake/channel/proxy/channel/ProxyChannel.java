@@ -17,69 +17,69 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class ProxyChannel extends Channel {
 
-    public static ProxyChannel getInstance() {
-        return (ProxyChannel) Channel.getInstance();
+  public static ProxyChannel getInstance() {
+    return (ProxyChannel) Channel.getInstance();
+  }
+
+  protected final Collection<Tuple<String, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
+  protected final Collection<ChannelTimeOutListener> timeOutListeners = ConcurrentHashMap.newKeySet();
+
+  public ProxyChannel(Thread mainThread, Integer serverPort, Integer proxyPort) {
+    super(mainThread, PROXY_NAME, serverPort, proxyPort);
+    this.setTimeOut(Duration.ofSeconds(60));
+  }
+
+  @Override
+  protected void loadChannelServer() {
+    this.server = new ProxyChannelServer(this);
+  }
+
+  @Override
+  protected void loadChannelClient() {
+    this.client = new ProxyChannelClient(this);
+  }
+
+  protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
+    if (msg.getMessageType().equals(Heartbeat.PONG)) {
+      this.pingedHosts.remove(new Tuple<>(((String) msg.getValue()), msg.getSender()));
     }
+  }
 
-    protected final Collection<Tuple<String, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
-    protected final Collection<ChannelTimeOutListener> timeOutListeners = ConcurrentHashMap.newKeySet();
+  public void addTimeOutListener(ChannelTimeOutListener listener) {
+    this.timeOutListeners.add(listener);
+  }
 
-    public ProxyChannel(Thread mainThread, Integer serverPort, Integer proxyPort) {
-        super(mainThread, PROXY_NAME, serverPort, proxyPort);
-        this.setTimeOut(Duration.ofSeconds(60));
+  public void ping(Collection<String> names) {
+    for (String name : names) {
+      Host host = this.getClient().getHostOfServer(name);
+
+      if (host == null) {
+        continue;
+      }
+
+      pingedHosts.add(new Tuple<>(name, host));
+      this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.PING));
     }
+  }
 
-    @Override
-    protected void loadChannelServer() {
-        this.server = new ProxyChannelServer(this);
+  public void checkPong() {
+    for (Tuple<String, Host> server : this.pingedHosts) {
+      this.getClient().handleServerUnregister(server.getA(), server.getB());
     }
-
-    @Override
-    protected void loadChannelClient() {
-        this.client = new ProxyChannelClient(this);
+    for (Tuple<String, Host> server : this.pingedHosts) {
+      for (ChannelTimeOutListener listener : this.timeOutListeners) {
+        listener.onServerTimeOut(server.getA());
+      }
     }
+    this.pingedHosts.clear();
+  }
 
-    protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
-        if (msg.getMessageType().equals(Heartbeat.PONG)) {
-            this.pingedHosts.remove(new Tuple<>(((String) msg.getValue()), msg.getSender()));
-        }
-    }
+  @Override
+  public ProxyChannelClient getClient() {
+    return (ProxyChannelClient) super.getClient();
+  }
 
-    public void addTimeOutListener(ChannelTimeOutListener listener) {
-        this.timeOutListeners.add(listener);
-    }
-
-    public void ping(Collection<String> names) {
-        for (String name : names) {
-            Host host = this.getClient().getHostOfServer(name);
-
-            if (host == null) {
-                continue;
-            }
-
-            pingedHosts.add(new Tuple<>(name, host));
-            this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.PING));
-        }
-    }
-
-    public void checkPong() {
-        for (Tuple<String, Host> server : this.pingedHosts) {
-            this.getClient().handleServerUnregister(server.getA(), server.getB());
-        }
-        for (Tuple<String, Host> server : this.pingedHosts) {
-            for (ChannelTimeOutListener listener : this.timeOutListeners) {
-                listener.onServerTimeOut(server.getA());
-            }
-        }
-        this.pingedHosts.clear();
-    }
-
-    @Override
-    public ProxyChannelClient getClient() {
-        return (ProxyChannelClient) super.getClient();
-    }
-
-    public void setUserServer(UUID uniqueId, String server) {
-        this.getClient().setUserServer(uniqueId, server);
-    }
+  public void setUserServer(UUID uniqueId, String server) {
+    this.getClient().setUserServer(uniqueId, server);
+  }
 }

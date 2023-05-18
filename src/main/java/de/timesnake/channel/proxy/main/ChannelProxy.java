@@ -16,43 +16,43 @@ import de.timesnake.library.basic.util.Loggers;
 import java.util.logging.Logger;
 
 @Plugin(id = "channel-proxy", name = "ChannelProxy", version = "1.0-SNAPSHOT",
-        url = "https://git.timesnake.de", authors = {"MarkusNils"})
+    url = "https://git.timesnake.de", authors = {"MarkusNils"})
 public class ChannelProxy {
 
-    public static void start(Integer port) {
-        Channel.setInstance(new ProxyChannel(Thread.currentThread(), port, port) {
-            @Override
-            public void runSync(SyncRun syncRun) {
-                ChannelProxy.server.getScheduler().buildTask(getPlugin(), syncRun::run).schedule();
-            }
-        });
+  public static void start(Integer port) {
+    Channel.setInstance(new ProxyChannel(Thread.currentThread(), port, port) {
+      @Override
+      public void runSync(SyncRun syncRun) {
+        ChannelProxy.server.getScheduler().buildTask(getPlugin(), syncRun::run).schedule();
+      }
+    });
 
-        Channel.getInstance().start();
+    Channel.getInstance().start();
+  }
+
+  public static void stop() {
+    if (Channel.getInstance() != null) {
+      Channel.getInstance().stop();
     }
+  }
 
-    public static void stop() {
-        if (Channel.getInstance() != null) {
-            Channel.getInstance().stop();
-        }
-    }
+  public static ChannelProxy getPlugin() {
+    return plugin;
+  }
 
-    public static ChannelProxy getPlugin() {
-        return plugin;
-    }
+  private static ChannelProxy plugin;
+  private static ProxyServer server;
 
-    private static ChannelProxy plugin;
-    private static ProxyServer server;
+  @Inject
+  public ChannelProxy(ProxyServer server, Logger logger) {
+    ChannelProxy.server = server;
 
-    @Inject
-    public ChannelProxy(ProxyServer server, Logger logger) {
-        ChannelProxy.server = server;
+    Loggers.CHANNEL.setUseParentHandlers(false);
+  }
 
-        Loggers.CHANNEL.setUseParentHandlers(false);
-    }
-
-    @Subscribe
-    public void onProxyInitialization(ProxyInitializeEvent event) {
-        plugin = this;
-        ChannelProxy.start(25565);
-    }
+  @Subscribe
+  public void onProxyInitialization(ProxyInitializeEvent event) {
+    plugin = this;
+    ChannelProxy.start(25565);
+  }
 }
