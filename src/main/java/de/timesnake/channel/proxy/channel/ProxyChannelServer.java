@@ -14,8 +14,8 @@ public class ProxyChannelServer extends Channel.ServerChannelServer {
   }
 
   @Override
-  protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
-    super.handlePingMessage(msg);
+  protected void handleHeartBeatMessage(ChannelHeartbeatMessage<?> msg) {
+    super.handleHeartBeatMessage(msg);
     ((ProxyChannel) this.manager).handlePingMessage(msg);
   }
 }
