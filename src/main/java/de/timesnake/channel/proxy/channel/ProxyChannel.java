@@ -26,7 +26,7 @@ public abstract class ProxyChannel extends Channel {
 
   public ProxyChannel(Thread mainThread, Integer serverPort, Integer proxyPort) {
     super(mainThread, PROXY_NAME, serverPort, proxyPort);
-    this.setTimeOut(Duration.ofSeconds(60));
+    this.setTimeOut(Duration.ofSeconds(30));
   }
 
   @Override

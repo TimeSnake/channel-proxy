@@ -15,7 +15,7 @@ import de.timesnake.channel.proxy.channel.ProxyChannel;
 import de.timesnake.library.basic.util.Loggers;
 import java.util.logging.Logger;
 
-@Plugin(id = "channel-proxy", name = "ChannelProxy", version = "1.0-SNAPSHOT",
+@Plugin(id = "channel-proxy", name = "ChannelProxy", version = "2.0-SNAPSHOT",
     url = "https://git.timesnake.de", authors = {"MarkusNils"})
 public class ChannelProxy {
 
