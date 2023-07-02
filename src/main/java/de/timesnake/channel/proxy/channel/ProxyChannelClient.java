@@ -8,14 +8,9 @@ import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.core.ChannelClient;
 import de.timesnake.channel.core.ChannelType;
 import de.timesnake.channel.core.Host;
-import de.timesnake.channel.util.message.ChannelGroupMessage;
-import de.timesnake.channel.util.message.ChannelListenerMessage;
-import de.timesnake.channel.util.message.ChannelMessage;
-import de.timesnake.channel.util.message.ChannelServerMessage;
-import de.timesnake.channel.util.message.ChannelSupportMessage;
-import de.timesnake.channel.util.message.ChannelUserMessage;
-import de.timesnake.channel.util.message.MessageType;
+import de.timesnake.channel.util.message.*;
 import de.timesnake.library.basic.util.Loggers;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -106,7 +101,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
 
   @Override
   public void handleRemoteListenerMessage(ChannelListenerMessage<?> msg) {
-    Host senderHost = msg.getSenderHost();
+    Host senderHost = msg.getIdentifier();
 
     // call own listeners
     this.manager.getServer().handleMessage(msg);
@@ -118,8 +113,8 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
       this.addRemoteListener(msg);
 
       // if register only for proxy then done
-      if (channelType.equals(ChannelType.SERVER) && ((String) identifier).equalsIgnoreCase(
-          Channel.PROXY_NAME)) {
+      if (channelType.equals(ChannelType.SERVER)
+          && ((String) identifier).equalsIgnoreCase(((ProxyChannel) this.manager).getServerName())) {
         return;
       }
 
@@ -128,7 +123,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
           .get(channelType)
           .computeIfAbsent(identifier, k -> ConcurrentHashMap.newKeySet());
 
-      if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
+      if (messageList.stream().noneMatch(m -> m.getIdentifier().equals(senderHost))) {
         messageList.add(msg);
       }
 
@@ -144,7 +139,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
         messageList = this.channelListenerByMessageTypeByChannelType
             .get(channelType)
             .computeIfAbsent(messageType, k -> ConcurrentHashMap.newKeySet());
-        if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
+        if (messageList.stream().noneMatch(m -> m.getIdentifier().equals(senderHost))) {
           messageList.add(msg);
         }
       } else {
@@ -152,7 +147,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
           messageList = this.channelListenerByMessageTypeByChannelType
               .get(channelType)
               .computeIfAbsent(type, k -> ConcurrentHashMap.newKeySet());
-          if (messageList.stream().noneMatch(m -> m.getSenderHost().equals(senderHost))) {
+          if (messageList.stream().noneMatch(m -> m.getIdentifier().equals(senderHost))) {
             messageList.add(msg);
           }
         }
@@ -232,7 +227,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
 
   public void handleHostRegister(Host host) {
     this.sendMessage(host, new ChannelListenerMessage<>(this.manager.getProxy(),
-        MessageType.Listener.REGISTER_SERVER, Channel.PROXY_NAME));
+        MessageType.Listener.REGISTER_SERVER, ((ProxyChannel) this.manager).getServerName()));
     Loggers.CHANNEL.info("Added host " + host);
     this.registeredHosts.add(host);
   }
@@ -256,11 +251,11 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
 
     // remove cached listener messages
     this.channelListenerByIdentifierByChannelType.values().forEach(map -> map.values()
-        .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
+        .forEach(set -> set.removeIf(msg -> msg.getIdentifier().equals(host)))
     );
 
     this.channelListenerByMessageTypeByChannelType.values().forEach(map -> map.values()
-        .forEach(set -> set.removeIf(msg -> msg.getSenderHost().equals(host)))
+        .forEach(set -> set.removeIf(msg -> msg.getIdentifier().equals(host)))
     );
 
     this.disconnectHost(host);
