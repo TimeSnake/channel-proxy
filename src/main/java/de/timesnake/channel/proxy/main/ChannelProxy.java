@@ -10,7 +10,7 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.timesnake.channel.core.Channel;
+import de.timesnake.channel.core.ServerChannel;
 import de.timesnake.channel.core.SyncRun;
 import de.timesnake.channel.proxy.channel.ProxyChannel;
 import de.timesnake.channel.util.ChannelConfig;
@@ -25,19 +25,19 @@ public class ChannelProxy {
   public static final int PORT = 25565;
 
   public static void start() {
-    Channel.setInstance(new ProxyChannel(Thread.currentThread(), config, config.getProxyServerName(), PORT) {
+    ServerChannel.setInstance(new ProxyChannel(Thread.currentThread(), config, config.getProxyServerName(), PORT) {
       @Override
       public void runSync(SyncRun syncRun) {
         ChannelProxy.server.getScheduler().buildTask(getPlugin(), syncRun::run).schedule();
       }
     });
 
-    Channel.getInstance().start();
+    ServerChannel.getInstance().start();
   }
 
   public static void stop() {
-    if (Channel.getInstance() != null) {
-      Channel.getInstance().stop();
+    if (ServerChannel.getInstance() != null) {
+      ServerChannel.getInstance().stop();
     }
   }
 

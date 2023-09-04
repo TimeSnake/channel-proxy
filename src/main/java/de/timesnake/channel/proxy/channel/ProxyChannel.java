@@ -4,23 +4,22 @@
 
 package de.timesnake.channel.proxy.channel;
 
-import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.core.Host;
+import de.timesnake.channel.core.ServerChannel;
 import de.timesnake.channel.proxy.listener.ChannelTimeOutListener;
 import de.timesnake.channel.util.ChannelConfig;
 import de.timesnake.channel.util.message.ChannelHeartbeatMessage;
 import de.timesnake.channel.util.message.MessageType.Heartbeat;
 import de.timesnake.library.basic.util.Tuple;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public abstract class ProxyChannel extends Channel {
+public abstract class ProxyChannel extends ServerChannel {
 
   public static ProxyChannel getInstance() {
-    return (ProxyChannel) Channel.getInstance();
+    return (ProxyChannel) ServerChannel.getInstance();
   }
 
   protected final Collection<Tuple<String, Host>> pingedHosts = ConcurrentHashMap.newKeySet();
@@ -28,12 +27,6 @@ public abstract class ProxyChannel extends Channel {
 
   public ProxyChannel(Thread mainThread, ChannelConfig config, String serverName, int serverPort) {
     super(mainThread, config, serverName, serverPort);
-    this.setTimeOut(Duration.ofSeconds(30));
-  }
-
-  @Override
-  protected void loadChannelServer() {
-    this.server = new ProxyChannelServer(this);
   }
 
   @Override
@@ -41,8 +34,10 @@ public abstract class ProxyChannel extends Channel {
     this.client = new ProxyChannelClient(this);
   }
 
-  protected void handlePingMessage(ChannelHeartbeatMessage<?> msg) {
-    if (msg.getMessageType().equals(Heartbeat.PONG)) {
+  @Override
+  public void onHeartBeatMessage(ChannelHeartbeatMessage<?> msg) {
+    super.onHeartBeatMessage(msg);
+    if (msg.getMessageType().equals(Heartbeat.SERVER_PONG)) {
       this.pingedHosts.remove(new Tuple<>(((String) msg.getValue()), msg.getIdentifier()));
     }
   }
@@ -60,11 +55,11 @@ public abstract class ProxyChannel extends Channel {
       }
 
       pingedHosts.add(new Tuple<>(name, host));
-      this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.PING));
+      this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.SERVER_PING));
     }
   }
 
-  public void checkPong() {
+  public void checkServerPong() {
     for (Tuple<String, Host> server : this.pingedHosts) {
       this.getClient().handleServerUnregister(server.getA(), server.getB());
     }
