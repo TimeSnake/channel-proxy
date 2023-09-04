@@ -4,10 +4,10 @@
 
 package de.timesnake.channel.proxy.channel;
 
-import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.core.ChannelClient;
 import de.timesnake.channel.core.ChannelType;
 import de.timesnake.channel.core.Host;
+import de.timesnake.channel.core.ServerChannel;
 import de.timesnake.channel.util.message.*;
 import de.timesnake.library.basic.util.Loggers;
 
@@ -18,7 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-public class ProxyChannelClient extends Channel.ServerChannelClient {
+public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
 
   //saves the server, there the user is
   protected final ConcurrentHashMap<UUID, Host> userServers = new ConcurrentHashMap<>();
@@ -30,7 +30,7 @@ public class ProxyChannelClient extends Channel.ServerChannelClient {
       channelListenerByMessageTypeByChannelType = new ConcurrentHashMap<>();
   protected ConcurrentHashMap<String, Host> serverHostByName = new ConcurrentHashMap<>();
 
-  public ProxyChannelClient(Channel manager) {
+  public ProxyChannelClient(ServerChannel manager) {
     super(manager);
     this.listenerLoaded = true;
 
