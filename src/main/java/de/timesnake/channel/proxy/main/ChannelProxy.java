@@ -96,4 +96,8 @@ public class ChannelProxy {
 
     ChannelProxy.start();
   }
+
+  public static ChannelConfig getConfig() {
+    return config;
+  }
 }
