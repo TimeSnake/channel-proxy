@@ -55,7 +55,7 @@ public abstract class ProxyChannel extends ServerChannel {
       }
 
       pingedHosts.add(new Tuple<>(name, host));
-      this.client.sendMessage(host, new ChannelHeartbeatMessage<>(host, Heartbeat.SERVER_PING));
+      this.client.sendMessageToHost(host, new ChannelHeartbeatMessage<>(host, Heartbeat.SERVER_PING));
     }
   }
 

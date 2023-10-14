@@ -8,14 +8,18 @@ import de.timesnake.channel.core.ChannelClient;
 import de.timesnake.channel.core.ChannelType;
 import de.timesnake.channel.core.Host;
 import de.timesnake.channel.core.ServerChannel;
+import de.timesnake.channel.util.listener.ResultMessage;
 import de.timesnake.channel.util.message.*;
 import de.timesnake.library.basic.util.Loggers;
+import de.timesnake.library.basic.util.Tuple;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
@@ -41,8 +45,9 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
   }
 
   @Override
-  public void sendMessageToProxy(ChannelMessage<?, ?> message) {
+  public Future<ResultMessage> sendMessageToProxy(ChannelMessage<?, ?> message) {
     this.manager.getServer().handleMessage(message);
+    return CompletableFuture.completedFuture(new ResultMessage());
   }
 
   private boolean isHostReceivable(Host host) {
@@ -50,16 +55,11 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
   }
 
   @Override
-  public void sendMessage(ChannelMessage<?, ?> message) {
-    new Thread(() -> this.sendMessageSynchronized(message)).start();
-  }
-
-  @Override
-  public void sendMessageSynchronized(ChannelMessage<?, ?> message) {
+  public ResultMessage sendMessageSynchronized(ChannelMessage<?, ?> message) {
     if (message instanceof ChannelGroupMessage) {
       for (Host host : registeredHosts) {
         if (this.isHostReceivable(host)) {
-          super.sendMessageSynchronized(host, message);
+          super.sendMessageSynchronizedToHost(host, message);
         }
       }
     } else if (message instanceof ChannelUserMessage) {
@@ -67,7 +67,7 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
       if (this.userServers.containsKey(uuid)) {
         Host host = this.userServers.get(uuid);
         if (this.isHostReceivable(host)) {
-          super.sendMessageSynchronized(host, message);
+          super.sendMessageSynchronizedToHost(host, message);
         }
       }
     } else if (message instanceof ChannelServerMessage) {
@@ -76,7 +76,7 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
 
       // send msg to server it self
       if (this.isHostReceivable(host)) {
-        super.sendMessageSynchronized(host, message);
+        super.sendMessageSynchronizedToHost(host, message);
       }
     } else if (message instanceof ChannelSupportMessage) {
       String name = ((ChannelSupportMessage<?>) message).getName();
@@ -84,11 +84,11 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
 
       // send to server with given name
       if (this.isHostReceivable(host)) {
-        super.sendMessageSynchronized(host, message);
+        super.sendMessageSynchronizedToHost(host, message);
       }
     }
 
-    super.sendMessageSynchronized(message);
+    return super.sendMessageSynchronized(message);
   }
 
   public void setUserServer(UUID uuid, String serverName) {
@@ -103,11 +103,11 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
     Host senderHost = msg.getIdentifier();
 
     // call own listeners
-    this.manager.getServer().handleMessage(msg);
+    this.manager.getServer().invokeLocalListeners(msg);
 
     if (msg.getMessageType().equals(MessageType.Listener.IDENTIFIER_LISTENER)) {
-      ChannelType<?> channelType = ((MessageType.MessageIdentifierListener<?>) msg.getValue()).getChannelType();
-      Object identifier = ((MessageType.MessageIdentifierListener<?>) msg.getValue()).getIdentifier();
+      ChannelType<?> channelType = ((Tuple<ChannelType<?>, ?>) msg.getValue()).getA();
+      Object identifier = ((Tuple<ChannelType<?>, ?>) msg.getValue()).getB();
 
       this.addRemoteListener(msg);
 
@@ -127,8 +127,8 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
 
       this.broadcastListenerMessage(msg);
     } else if (msg.getMessageType().equals(MessageType.Listener.MESSAGE_TYPE_LISTENER)) {
-      ChannelType<?> channelType = ((MessageType.MessageTypeListener) msg.getValue()).getChannelType();
-      MessageType<?> messageType = ((MessageType.MessageTypeListener) msg.getValue()).getMessageType();
+      ChannelType<?> channelType = ((Tuple<ChannelType<?>, MessageType<?>>) msg.getValue()).getA();
+      MessageType<?> messageType = ((Tuple<ChannelType<?>, MessageType<?>>) msg.getValue()).getB();
 
       this.addRemoteListener(msg);
 
@@ -164,7 +164,7 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
 
   private void broadcastListenerMessage(ChannelListenerMessage<?> msg) {
     for (Host host : this.registeredHosts) {
-      this.sendMessage(host, msg);
+      this.sendMessageToHost(host, msg);
     }
   }
 
@@ -193,11 +193,11 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
             .collect(Collectors.toSet()));
 
     for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
-      this.sendMessageSynchronized(host, listenerMessage);
+      this.sendMessageSynchronizedToHost(host, listenerMessage);
     }
 
     // send message proxy register to tell that all listeners are sent
-    this.sendMessageSynchronized(host, new ChannelListenerMessage<>(this.manager.getProxy(),
+    this.sendMessageSynchronizedToHost(host, new ChannelListenerMessage<>(this.manager.getProxy(),
         MessageType.Listener.REGISTER_SERVER, serverName));
 
     Loggers.CHANNEL.info("Send listener to " + host + " finished");
@@ -230,10 +230,10 @@ public class ProxyChannelClient extends ServerChannel.ServerChannelClient {
         .collect(Collectors.toSet()));
 
     for (ChannelListenerMessage<?> listenerMessage : listenerMessages) {
-      this.sendMessageSynchronized(host, listenerMessage);
+      this.sendMessageSynchronizedToHost(host, listenerMessage);
     }
 
-    this.sendMessage(host, new ChannelListenerMessage<>(this.manager.getProxy(),
+    this.sendMessageToHost(host, new ChannelListenerMessage<>(this.manager.getProxy(),
         MessageType.Listener.REGISTER_SERVER, ((ProxyChannel) this.manager).getServerName()));
     Loggers.CHANNEL.info("Send listener to " + host + " finished");
 
