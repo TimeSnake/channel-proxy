@@ -40,9 +40,11 @@ dependencies {
 
 configurations.configureEach {
   resolutionStrategy.dependencySubstitution {
-    substitute module("de.timesnake:channel-api") using project(":channel-api")
-    substitute module("de.timesnake:library-basic") using project(":library-basic")
-    substitute module("de.timesnake:library-chat") using project(":library-chat")
+    if (project.parent != null) {
+      substitute module("de.timesnake:channel-api") using project(":channel-api")
+      substitute module("de.timesnake:library-basic") using project(":library-basic")
+      substitute module("de.timesnake:library-chat") using project(":library-chat")
+    }
   }
 }
 
