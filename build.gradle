@@ -4,28 +4,45 @@ plugins {
   id('com.github.johnrengelman.shadow')
 }
 
-group = project.group
-version = project(":channel-api").version
+group = "de.timesnake"
+version = '3.0.5'
 var projectId = 47
 
 repositories {
   mavenLocal()
   mavenCentral()
   maven {
-    url = uri 'https://papermc.io/repo/repository/maven-public/'
+    url 'https://papermc.io/repo/repository/maven-public/'
+  }
+  maven {
+    url "https://git.timesnake.de/api/v4/groups/7/-/packages/maven"
+    name "TimeSnake"
+    credentials {
+      username = timesnakeUser
+      password = timesnakePassword
+    }
   }
 }
 
 dependencies {
-  implementation project(':channel-api')
-  compileOnly project(':library-basic')
-  compileOnly project(':library-chat')
+  implementation "de.timesnake:channel-api:3.0.5"
+  compileOnly "de.timesnake:library-basic:1.2.2"
+  compileOnly "de.timesnake:library-chat:1.1"
 
   compileOnly 'org.jetbrains:annotations:23.0.0'
 
-  compileOnly project.velocity
-  annotationProcessor project.velocity
+  compileOnly "com.velocitypowered:velocity-api:3.1.1"
+  annotationProcessor "com.velocitypowered:velocity-api:3.1.1"
 }
+
+configurations.configureEach {
+  resolutionStrategy.dependencySubstitution {
+    substitute module("de.timesnake:channel-api") using project(":channel-api")
+    substitute module("de.timesnake:library-basic") using project(":library-basic")
+    substitute module("de.timesnake:library-chat") using project(":library-chat")
+  }
+}
+
 
 shadowJar {
     getDestinationDirectory().set(new File(timesnakePluginDir));
@@ -36,12 +53,14 @@ jar.finalizedBy(shadowJar)
 publishing {
   repositories {
     maven {
-        url "https://git.timesnake.de/api/v4/projects/" + projectId + "/packages/maven"
-      credentials {
-          username = timesnakeDeployUser
-          password = timesnakeDeployKey
+      url "https://git.timesnake.de/api/v4/projects/" + projectId + "/packages/maven"
+      credentials(HttpHeaderCredentials) {
+        name = "Job-Token"
+        value = System.getenv("CI_JOB_TOKEN")
       }
-
+      authentication {
+        header(HttpHeaderAuthentication)
+      }
     }
   }
 
