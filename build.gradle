@@ -29,6 +29,7 @@ repositories {
 
 dependencies {
   implementation "de.timesnake:channel-api:3.0.5"
+
   compileOnly "de.timesnake:library-basic:1.2.2"
   compileOnly "de.timesnake:library-chat:1.1"
 
@@ -48,9 +49,11 @@ configurations.configureEach {
   }
 }
 
+tasks.register('exportAsPlugin', Copy) {
+  from "$buildDir/libs/${archivesBaseName}-${project.version}.jar"
+  into "${timesnakePluginDir}"
 
-shadowJar {
-  getDestinationDirectory().set(new File(timesnakePluginDir));
+  dependsOn(assemble)
 }
 
 jar.finalizedBy(shadowJar)
