@@ -50,10 +50,10 @@ configurations.configureEach {
 }
 
 tasks.register('exportAsPlugin', Copy) {
-  from "$buildDir/libs/${archivesBaseName}-${project.version}.jar"
+  from "$buildDir/libs/${archivesBaseName}-${project.version}-all.jar"
   into "${timesnakePluginDir}"
 
-  dependsOn(assemble)
+  dependsOn(shadowJar)
 }
 
 jar.finalizedBy(shadowJar)
