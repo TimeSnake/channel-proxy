@@ -1,4 +1,4 @@
 main: de.timesnake.channel.proxy.main.ChannelProxy
-version: 1.0
+version: 3.0.5
 name: channel-proxy
 author: Mn
