@@ -8,7 +8,7 @@ plugins {
 
 
 group = "de.timesnake"
-version = '3.0.5'
+version = '3.0.6'
 var projectId = 47
 
 repositories {
