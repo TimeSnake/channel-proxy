@@ -10,34 +10,31 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.timesnake.channel.core.ServerChannel;
-import de.timesnake.channel.core.SyncRun;
-import de.timesnake.channel.proxy.channel.ProxyChannel;
+import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.util.ChannelConfig;
 import de.timesnake.library.basic.util.Loggers;
 
 import java.io.File;
-import java.util.logging.Logger;
 
 @Plugin(id = "channel-proxy", name = "ChannelProxy", version = "2.0-SNAPSHOT",
-    url = "https://git.timesnake.de", authors = {"MarkusNils"})
+    url = "https://git.timesnake.de", authors = {"timesnake"})
 public class ChannelProxy {
-  public static final int PORT = 25565;
 
   public static void start() {
-    ServerChannel.setInstance(new ProxyChannel(Thread.currentThread(), config, config.getProxyServerName(), PORT) {
+    Channel.setInstance(new ProxyChannel(Thread.currentThread(), config) {
       @Override
-      public void runSync(SyncRun syncRun) {
-        ChannelProxy.server.getScheduler().buildTask(getPlugin(), syncRun::run).schedule();
+      public void runSync(Runnable runnable) {
+        ChannelProxy.server.getScheduler().buildTask(getPlugin(), runnable).schedule();
       }
     });
 
-    ServerChannel.getInstance().start();
+    Channel.getInstance().start();
+    Channel.getInstance().selfInit();
   }
 
   public static void stop() {
-    if (ServerChannel.getInstance() != null) {
-      ServerChannel.getInstance().stop();
+    if (Channel.getInstance() != null) {
+      Channel.getInstance().stop();
     }
   }
 
@@ -50,7 +47,7 @@ public class ChannelProxy {
   private static ChannelConfig config;
 
   @Inject
-  public ChannelProxy(ProxyServer server, Logger logger) {
+  public ChannelProxy(ProxyServer server) {
     ChannelProxy.server = server;
 
     Loggers.CHANNEL.setUseParentHandlers(false);
