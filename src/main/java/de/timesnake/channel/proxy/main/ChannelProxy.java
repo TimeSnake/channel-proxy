@@ -12,7 +12,8 @@ import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.timesnake.channel.core.Channel;
 import de.timesnake.channel.util.ChannelConfig;
-import de.timesnake.library.basic.util.Loggers;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.config.Configurator;
 
 import java.io.File;
 
@@ -28,6 +29,7 @@ public class ChannelProxy {
       }
     });
 
+    Configurator.setAllLevels(Channel.getInstance().getLogger().getName(), Level.WARN);
     Channel.getInstance().start();
     Channel.getInstance().selfInit();
   }
@@ -49,8 +51,6 @@ public class ChannelProxy {
   @Inject
   public ChannelProxy(ProxyServer server) {
     ChannelProxy.server = server;
-
-    Loggers.CHANNEL.setUseParentHandlers(false);
   }
 
   @Subscribe
