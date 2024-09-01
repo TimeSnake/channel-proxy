@@ -15,7 +15,7 @@ repositories {
   mavenLocal()
   mavenCentral()
   maven {
-    url 'https://papermc.io/repo/repository/maven-public/'
+    url "https://repo.papermc.io/repository/maven-public/"
   }
   maven {
     url "https://git.timesnake.de/api/v4/groups/7/-/packages/maven"
