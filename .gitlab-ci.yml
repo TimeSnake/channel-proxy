@@ -1,4 +1,4 @@
-image: gradle:8-jdk17-alpine
+image: gradle:8-jdk21-alpine
 
 before_script:
   - export GRADLE_USER_HOME="$(pwd)/.gradle"
@@ -35,6 +35,8 @@ build:
       - .gradle
   tags:
     - gradle
+  only:
+    - tags
 
 
 publish:
