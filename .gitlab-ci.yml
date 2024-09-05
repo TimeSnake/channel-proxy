@@ -10,10 +10,6 @@ before_script:
   - echo "timesnakePassword=$CI_JOB_TOKEN" >> $GRADLE_USER_HOME/gradle.properties
 
 
-variables:
-  GIT_STRATEGY: fetch
-  GIT_FETCH_EXTRA_FLAGS: --tags
-
 cache:
   paths:
     - .gradle/wrapper
