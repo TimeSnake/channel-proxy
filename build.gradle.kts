@@ -1,5 +1,3 @@
-import kotlin.io.path.name
-
 plugins {
     id("java")
     id("java-base")
@@ -35,8 +33,8 @@ dependencies {
     compileOnly("org.apache.logging.log4j:log4j-api:2.22.1")
     compileOnly("org.apache.logging.log4j:log4j-core:2.22.1")
 
-    compileOnly("com.velocitypowered:velocity-api:3.1.1")
-    annotationProcessor("com.velocitypowered:velocity-api:3.1.1")
+    compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
+    annotationProcessor("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
 }
 
 configurations.configureEach {
