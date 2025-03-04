@@ -62,17 +62,17 @@ public class ChannelProxy {
     config = new ChannelConfig() {
       @Override
       public String getServerHostName() {
-        return toml.getString("host_name");
+        return toml.getString("host_name", System.getenv("TS_CHANNEL_HOSTNAME"));
       }
 
       @Override
       public String getListenHostName() {
-        return toml.getString("listen_host_name");
+        return toml.getString("listen_host_name", System.getenv("TS_CHANNEL_LISTEN_HOSTNAME"));
       }
 
       @Override
       public String getProxyHostName() {
-        return toml.getString("proxy.host_name");
+        return toml.getString("proxy.host_name", System.getenv("TS_CHANNEL_HOSTNAME"));
       }
 
       @Override
